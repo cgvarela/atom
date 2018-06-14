@@ -8,13 +8,19 @@ bundledKeymaps = require('../package.json')?._atomKeymaps
 KeymapManager::onDidLoadBundledKeymaps = (callback) ->
   @emitter.on 'did-load-bundled-keymaps', callback
 
+KeymapManager::onDidLoadUserKeymap = (callback) ->
+  @emitter.on 'did-load-user-keymap', callback
+
+KeymapManager::canLoadBundledKeymapsFromMemory = ->
+  bundledKeymaps?
+
 KeymapManager::loadBundledKeymaps = ->
-  keymapsPath = path.join(@resourcePath, 'keymaps')
   if bundledKeymaps?
     for keymapName, keymap of bundledKeymaps
-      keymapPath = path.join(keymapsPath, keymapName)
-      @add(keymapPath, keymap)
+      keymapPath = "core:#{keymapName}"
+      @add(keymapPath, keymap, 0, @devMode ? false)
   else
+    keymapsPath = path.join(@resourcePath, 'keymaps')
     @loadKeymap(keymapsPath)
 
   @emitter.emit 'did-load-bundled-keymaps'
@@ -32,7 +38,7 @@ KeymapManager::loadUserKeymap = ->
   return unless fs.isFileSync(userKeymapPath)
 
   try
-    @loadKeymap(userKeymapPath, watch: true, suppressErrors: true)
+    @loadKeymap(userKeymapPath, watch: true, suppressErrors: true, priority: 100)
   catch error
     if error.message.indexOf('Unable to watch path') > -1
       message = """
@@ -48,6 +54,9 @@ KeymapManager::loadUserKeymap = ->
       detail = error.path
       stack = error.stack
       @notificationManager.addFatalError(error.message, {detail, stack, dismissable: true})
+
+  @emitter.emit 'did-load-user-keymap'
+
 
 KeymapManager::subscribeToFileReadFailure = ->
   @onDidFailToReadFile (error) =>
